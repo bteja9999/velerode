@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "velero.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "velero.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "velero.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "velero.selectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/s3: {{ include (print $.Template.BasePath "/s3-secret.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "velero.serviceAccountName" . }}
+      {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      {{- end }}
+      containers:
+      - name: {{ .Chart.Name }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: Always
+        env:
+        - name: CHART_NAMESPACE
+          value: {{ .Release.Namespace }}
+          {{- if .Values.s3.enabled }}
+        - name: DEFAULT_S3_BACKUP_STORAGE_LOCATION
+          value: {{ .Values.s3.region}}
+          {{- end }}
+        - name: AWS_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: bkp-credentials
+              key: accessKey
+        - name: AWS_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: bkp-credentials
+              key: secretKey
